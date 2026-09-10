@@ -1,0 +1,59 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: 安装依赖
+        run: npm ci
+
+      - name: 内容校验（清单 / 缩略图 / 字段完整性）
+        run: npm run content:verify
+
+      - name: 单元测试
+        run: npm run test
+
+      - name: 类型检查
+        run: npm run lint
+
+      - name: 构建
+        run: npm run build
+
+      - name: 产物体积预算
+        run: |
+          set -e
+          echo "== dist 体积 =="
+          du -sh dist
+          JS=$(find dist -name '*.js' -print0 | xargs -0 cat 2>/dev/null | wc -c)
+          CSS=$(find dist -name '*.css' -print0 | xargs -0 cat 2>/dev/null | wc -c)
+          echo "JS bytes=$JS CSS bytes=$CSS"
+          # 预算：首屏 JS ≤ 64KB，CSS ≤ 48KB
+          test "$JS" -le $((64 * 1024)) || { echo "✖ JS 超出预算"; exit 1; }
+          test "$CSS" -le $((48 * 1024)) || { echo "✖ CSS 超出预算"; exit 1; }
+          echo "✔ 体积预算通过"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist
+          retention-days: 7

@@ -1,0 +1,99 @@
+---
+/**
+ * HeroCanvas —— 首屏装饰性 canvas
+ * 零依赖 2D canvas：漂浮色块 + 缓慢位移，命中「奶黄 / 绿眼」品牌色。
+ * 无障碍：aria-hidden，prefers-reduced-motion / 专注模式下一律不渲染。
+ */
+---
+
+<canvas class="hero-canvas decor" data-hero-canvas aria-hidden="true"></canvas>
+
+<script>
+  type Blob = { x: number; y: number; r: number; vx: number; vy: number; c: string }
+
+  function boot() {
+    const canvas = document.querySelector<HTMLCanvasElement>("[data-hero-canvas]")
+    if (!canvas) return
+    const ctx = canvas.getContext("2d", { alpha: true })
+    if (!ctx) return
+    if (matchMedia("(prefers-reduced-motion: reduce)").matches) return
+    if (document.documentElement.dataset.focus === "on") return
+
+    const palette = ["255,213,79", "102,187,106", "249,168,37", "254,249,237"]
+    let w = 0
+    let h = 0
+    let dpr = 1
+    let blobs: Blob[] = []
+    let raf = 0
+    let paused = false
+
+    const resize = () => {
+      dpr = Math.min(devicePixelRatio || 1, 1.6)
+      const rect = canvas.getBoundingClientRect()
+      w = Math.max(1, rect.width)
+      h = Math.max(1, rect.height)
+      canvas.width = Math.floor(w * dpr)
+      canvas.height = Math.floor(h * dpr)
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+      const n = w < 700 ? 7 : 13
+      blobs = Array.from({ length: n }, (_, i) => ({
+        x: Math.random() * w,
+        y: Math.random() * h,
+        r: 60 + Math.random() * 220,
+        vx: (Math.random() - 0.5) * 0.18,
+        vy: (Math.random() - 0.5) * 0.18,
+        c: palette[i % palette.length],
+      }))
+    }
+
+    const frame = () => {
+      raf = 0
+      if (paused) return
+      ctx.clearRect(0, 0, w, h)
+      for (const b of blobs) {
+        b.x += b.vx
+        b.y += b.vy
+        if (b.x < -b.r) b.x = w + b.r
+        if (b.x > w + b.r) b.x = -b.r
+        if (b.y < -b.r) b.y = h + b.r
+        if (b.y > h + b.r) b.y = -b.r
+        const g = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, b.r)
+        g.addColorStop(0, `rgba(${b.c},0.20)`)
+        g.addColorStop(1, `rgba(${b.c},0)`)
+        ctx.fillStyle = g
+        ctx.beginPath()
+        ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2)
+        ctx.fill()
+      }
+      raf = requestAnimationFrame(frame)
+    }
+
+    const start = () => {
+      if (!raf && !paused) raf = requestAnimationFrame(frame)
+    }
+    const stop = () => {
+      if (raf) cancelAnimationFrame(raf)
+      raf = 0
+    }
+
+    resize()
+    start()
+    addEventListener("resize", () => {
+      resize()
+      start()
+    })
+    document.addEventListener("visibilitychange", () => (document.hidden ? stop() : start()))
+    addEventListener("nl:pause-decor", () => {
+      paused = true
+      stop()
+      ctx.clearRect(0, 0, w, h)
+    })
+    addEventListener("nl:resume-decor", () => {
+      paused = false
+      start()
+    })
+  }
+
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot)
+  else boot()
+</script>

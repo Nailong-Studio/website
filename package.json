@@ -1,0 +1,31 @@
+{
+  "name": "nailong-gallery",
+  "type": "module",
+  "version": "2.0.0",
+  "private": true,
+  "description": "奶龙艺术宇宙 · 数字美术馆 (Nailong Gallery v2)",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "npm run content:build && npm run content:verify && astro build && node scripts/check-links.mjs",
+    "build:site": "astro build",
+    "preview": "astro preview",
+    "content:build": "node scripts/build-artworks.mjs",
+    "content:verify": "node scripts/verify-content.mjs",
+    "test": "vitest run",
+    "check": "npm run content:verify && npm run test && npm run lint",
+    "lint": "tsc --noEmit",
+    "links": "node scripts/check-links.mjs"
+  },
+  "engines": {
+    "node": ">=20.3.0"
+  },
+  "dependencies": {
+    "@astrojs/sitemap": "^3.7.4",
+    "astro": "^7.3.2",
+    "sharp": "^0.35.4"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.0"
+  }
+}

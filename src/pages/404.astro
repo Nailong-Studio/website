@@ -1,0 +1,16 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro"
+import { url } from "../lib/url"
+---
+
+<BaseLayout title="页面走丢了" description="没有找到这个页面，回到画廊继续逛。" noindex>
+  <section class="wrap center-stage">
+    <p class="eyebrow">404</p>
+    <h1 style="font-size:var(--fs-3xl)">这一格是空的</h1>
+    <p style="color:var(--c-text-dim)">你要找的作品可能已经改名或移到别的展厅了。</p>
+    <div style="display:flex;gap:var(--s-3);justify-content:center;flex-wrap:wrap">
+      <a class="btn btn--primary" href={url("/gallery/")}>回到画廊</a>
+      <a class="btn" href={url("/")}>返回首页</a>
+    </div>
+  </section>
+</BaseLayout>
