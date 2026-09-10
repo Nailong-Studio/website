@@ -1,10 +1,30 @@
 # 奶龙艺术宇宙 · 数字美术馆（Nailong Gallery v2）
 
+[![CI](https://github.com/Nailong-Studio/website/actions/workflows/ci.yml/badge.svg)](https://github.com/Nailong-Studio/website/actions/workflows/ci.yml)
+[![Deploy to GitHub Pages](https://github.com/Nailong-Studio/website/actions/workflows/deploy.yml/badge.svg)](https://github.com/Nailong-Studio/website/actions/workflows/deploy.yml)
+[![Astro](https://img.shields.io/badge/Astro-7.x-ff5d01?logo=astro&logoColor=white)](https://astro.build)
+[![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+![Works](https://img.shields.io/badge/作品-134%20件-FFD54F)
+![a11y](https://img.shields.io/badge/axe--core-violations%200-66BB6A)
+
 > 134 件奶龙主题艺术作品，五大展厅，一次策展式浏览。
 > 线上地址：https://nailong-studio.github.io/website/
 
 上一版是 Vite + glightbox 的单页画廊，存在两个线上缺陷（灯箱大图 404、家族导航链接 404），
 本站为按重构计划 v2.0 的完整重写：Astro 静态站 + 构建期内容管线 + 零运行时依赖的交互层。
+
+## 动图预览
+
+浏览器路线（全部作品页，滚动浏览）：
+
+![画廊滚动预览](docs/demo-scroll.webp)
+
+作品墙总览（134 张缩略图拼成的墙，缓慢拉远）：
+
+![作品墙总览](docs/demo-wall.webp)
+
+> WebP 动图（GitHub 可直接播放）；GIF 兼容版用 `DEMO_GIF=1 npm run demo:wall` / `DEMO_GIF=1 npm run demo:scroll` 本地生成。
+> 静态总览海报：[`docs/artworks-wall.jpg`](docs/artworks-wall.jpg)；验收拼版：[桌面](docs/shots/sheet-desktop.png) / [移动与状态](docs/shots/sheet-states.png)。
 
 ## 亮点
 
@@ -38,6 +58,9 @@ scripts/
   build-artworks.mjs   # 内容管线：清单 → manifest.json（slug/主色/LQIP/CDN srcset）
   verify-content.mjs   # 内容校验：数量/唯一性/字段/缩略图存在
   check-links.mjs      # 构建产物自检：内部链接与缩略图必须命中
+  make-wall-demo.mjs   # 生成 docs/demo-wall.webp（作品墙拉远动图，仅需 sharp）
+  make-scroll-demo.mjs # 生成 docs/demo-scroll.webp（画廊滚动动图，需 puppeteer-core）
+docs/                  # 动图与验收截图（README 引用）
 public/thumbs/…        # 134 张 400px WebP 缩略图（提交入库）
 ```
 
@@ -52,6 +75,8 @@ npm run lint         # tsc --noEmit 类型检查
 npm run content:verify   # 只跑内容校验
 npm run check        # 内容校验 + 测试 + 类型检查（CI 同款）
 npm run preview      # 预览构建产物
+npm run demo:wall    # 生成作品墙总览动图（仅需 sharp）
+npm run demo:scroll  # 生成画廊滚动动图（需 DevDep: puppeteer-core + PUPPETEER_CHROME）
 ```
 
 ## 部署
@@ -73,12 +98,27 @@ npm run preview      # 预览构建产物
 
 新增作品：把图丢进 [wallpaper 仓](https://github.com/Nailong-Studio/wallpaper) 对应分类目录，本地生成 400px WebP 缩略图放进 `public/thumbs/<分类>/`，更新 `gallery.json`，跑 `npm run build`。
 
+## 验收结果（2026-09-10 · 提交 e6e078e 之前本地跑）
+
+| 项 | 结果 |
+| --- | --- |
+| 构建 | 143 页，`dist` 6.4 MB（不含 CDN 原图） |
+| 内容校验 | 134 件作品、134 张缩略图、分类计数一致 |
+| 内部链接自检 | 280 个唯一目标，0 缺失 |
+| 单元测试 / 类型 | Vitest 11/11，`tsc --noEmit` 无错 |
+| 体积预算 | JS 5.0 KB（≤ 64 KB）· CSS 14.9 KB（≤ 48 KB） |
+| 真机渲染（headless Chrome 153） | 6 条路由 × 深浅主题：0 console error / 0 断图 / 0 横向溢出 |
+| 无障碍（axe-core 4.10.2） | 6 路由（含两页浅色）**violations = 0**，passes 34–37 |
+
+复测要点：截图/扫描必须 `setCacheEnabled(false)` 并清 `localStorage`，否则会拿到旧 CSS 或继承的专注模式状态导致误报。
+
 ## 已知待办
 
-- 图库原图约 280MB，继续走 CDN 不入构建产物；如需完全自托管，建议接 Cloudflare Images 或对象存储。
+- 图库原图约 280 MB，继续走 CDN 不入构建产物；如需完全自托管，建议接 Cloudflare Images 或对象存储。
 - 详情页「深缩放」浏览、WebGL 展陈（Three.js）为计划中的下一阶段，当前以 2D canvas Hero 与原生灯箱打底。
-- Lighthouse / axe 自动化门禁需要无头浏览器，本地已用 headless Chrome 跑通（134 页构建 + 6 条路由 × 深浅双主题，axe-core 4.10.2 零 violation），但尚未纳入 CI（体积预算与链接自检已覆盖最主要回归面）。
+- Lighthouse 未纳入门禁：容器内 0–100 分依赖真实网络到 CDN，噪声大；CI 暂以体积预算 + 链接自检 + 内容校验作为回归面，axe 已用本地 headless Chrome 跑通但未进 CI。
 - 中文正文换行与首屏字体：当前依赖系统字体回退，后续可自托管 Inter + 子集化中文字体（需评估体积）。
+- 缩略图为 400 px 单档，未出 2x srcset（4K 屏偏软）。
 
 ---
 
