@@ -78,13 +78,14 @@ const extraLd = jsonLd ? (Array.isArray(jsonLd) ? jsonLd : [jsonLd]) : []
 
     <script
       is:inline
-      set:html={`(function(){try{var d=document.documentElement;var t=localStorage.getItem('nl:theme');if(t)d.dataset.theme=t;var f=localStorage.getItem('nl:focus');if(f==='on')d.dataset.focus='on';}catch(e){}})();`}
+      set:html={`(function(){try{var d=document.documentElement;d.classList.add('js');var t=localStorage.getItem('nl:theme');if(t)d.dataset.theme=t;var f=localStorage.getItem('nl:focus');if(f==='on')d.dataset.focus='on';setTimeout(function(){var n=document.querySelectorAll('[data-reveal]:not([data-revealed])');for(var i=0;i<n.length;i++)n[i].setAttribute('data-revealed','true');},2500);}catch(e){}})();`}
     />
+    <noscript><style>[data-reveal]{opacity:1 !important;transform:none !important}</style></noscript>
     <script type="application/ld+json" set:html={JSON.stringify(baseLd)} />
     {extraLd.map((ld) => <script type="application/ld+json" set:html={JSON.stringify(ld)} />)}
   </head>
 
-  <body class="noise">
+  <body class="has-noise">
     <a class="skip-link" href="#main">跳到主要内容</a>
     <div class="progress" aria-hidden="true"></div>
 

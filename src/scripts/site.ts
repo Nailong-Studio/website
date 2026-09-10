@@ -240,7 +240,10 @@ function initFilter() {
       card.hidden = !hit
       if (hit) shown++
     }
-    chips.forEach((c) => c.setAttribute("aria-pressed", String(c.dataset.chip === cat)))
+    chips.forEach((c) => {
+      if (c.dataset.chip === cat) c.setAttribute("aria-current", "page")
+      else c.removeAttribute("aria-current")
+    })
     if (counter) counter.textContent = `${shown} 件`
     if (push) {
       const target = chips.find((c) => c.dataset.chip === cat)?.getAttribute("href")

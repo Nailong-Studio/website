@@ -127,7 +127,10 @@ async function main() {
       tags: ov.tags ?? [],
       src: g.src,
       thumb: g.thumb,
+      // 原始文件（GitHub raw，6–10MB，仅用于"原始文件"下载入口）
       full: `${RAW_BASE}/${g.src.replace(/^wallpapers\//, "")}`,
+      // 展示用大图：走 CDN 转码（2048px WebP），避免直接拉 6–10MB PNG
+      view: cdnUrl(g.src.replace(/^wallpapers\//, ""), 2048),
       fullSrcset: CDN_WIDTHS.map((w) => `${cdnUrl(g.src.replace(/^wallpapers\//, ""), w)} ${w}w`).join(", "),
       w: g.w,
       h: g.h,

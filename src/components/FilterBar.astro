@@ -22,7 +22,7 @@ const chips: { key: Category | "all"; label: string; href: string }[] = [
         class="chip"
         href={chip.href}
         data-chip={chip.key}
-        aria-pressed={String(chip.key === active)}
+        aria-current={chip.key === active ? "page" : undefined}
       >
         {chip.label}
       </a>

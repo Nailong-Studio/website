@@ -26,8 +26,8 @@ const ld = {
   description: item.story,
   artform: "Digital Art",
   genre: theme.name,
-  image: item.full,
-  contentUrl: item.full,
+  image: item.view,
+  contentUrl: item.view,
   width: { "@type": "QuantitativeValue", value: item.w, unitCode: "E37" },
   height: { "@type": "QuantitativeValue", value: item.h, unitCode: "E37" },
   isPartOf: { "@type": "ImageGallery", name: `奶龙艺术宇宙 · ${theme.name}` },
@@ -62,20 +62,20 @@ const crumbs = {
       <div>
         <a
           class="detail__stage"
-          href={item.full}
+          href={item.view}
           data-lb-solo
           data-lb
-          data-lb-full={item.full}
+          data-lb-full={item.view}
           data-lb-srcset={item.fullSrcset}
           data-lb-title={displayTitle}
-          data-lb-href={item.full}
+          data-lb-href={item.view}
           data-lb-w={item.w}
           data-lb-h={item.h}
           style={`--tint:${item.dominant};--lqip:url("${item.lqip}")`}
           aria-label="点击放大原图"
         >
           <img
-            src={item.full}
+            src={item.view}
             srcset={item.fullSrcset}
             sizes="(min-width: 1000px) 66vw, 100vw"
             width={item.w}
@@ -88,7 +88,7 @@ const crumbs = {
         <p class="eyebrow" style="margin-top:var(--s-3)">点击图片进入全屏预览 · 大图按屏幕宽度实时转码</p>
       </div>
 
-      <aside class="detail__meta">
+      <div class="detail__meta">
         <p class="eyebrow">{theme.en}</p>
         <h1 style="font-size:var(--fs-2xl);margin:var(--s-2) 0 var(--s-3)">{item.title}</h1>
         {item.variant && <p class="eyebrow" style="margin-bottom:var(--s-4)">版本 {item.variant}</p>}
@@ -110,12 +110,13 @@ const crumbs = {
         </dl>
 
         <div style="display:flex;flex-direction:column;gap:var(--s-2);margin-top:var(--s-5)">
-          <a class="btn btn--primary" href={item.full} target="_blank" rel="noopener" download>下载原图 ↓</a>
+          <a class="btn btn--primary" href={item.view} target="_blank" rel="noopener" download>下载大图（CDN 优化 WebP）↓</a>
+          <a class="btn" href={item.full} target="_blank" rel="noopener" download>下载原始文件（GitHub · 约 {humanSize(item.size)}）↓</a>
           <a class="btn" href={`https://github.com/Nailong-Studio/wallpaper/blob/main/${item.src.replace(/^wallpapers\//, "")}`} target="_blank" rel="noopener">
             在 GitHub 查看源文件 ↗
           </a>
         </div>
-      </aside>
+      </div>
     </div>
 
     <nav class="section" aria-label="展厅内翻页" style="display:flex;gap:var(--s-3);justify-content:space-between;flex-wrap:wrap">

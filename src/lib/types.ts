@@ -26,6 +26,7 @@ export interface Artwork {
   src: string
   thumb: string
   full: string
+  view: string
   fullSrcset: string
   w: number
   h: number

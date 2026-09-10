@@ -17,8 +17,8 @@
   --c-border: #26262c;
   --c-border-soft: #1d1d22;
   --c-text: #eceff1;
-  --c-text-dim: #a4a8b0;
-  --c-text-mute: #6f747d;
+  --c-text-dim: #b3b8c0;
+  --c-text-mute: #9aa0ab;
 
   /* --- 语义色 --- */
   --c-accent: var(--c-yellow);
@@ -105,23 +105,25 @@
   --c-border: #e2ddd0;
   --c-border-soft: #ece8dd;
   --c-text: #23211d;
-  --c-text-dim: #5d5850;
-  --c-text-mute: #8d8880;
+  --c-text-dim: #55504a;
+  --c-text-mute: #6b655c;
   --glass-bg: rgb(251 249 244 / 0.78);
   --sh-2: 0 8px 24px rgb(93 82 75 / 0.12);
   --sh-3: 0 24px 64px rgb(93 82 75 / 0.18);
 }
 
-/* 专注模式：隐藏一切装饰性动效与次要信息 */
+/* 专注模式：隐藏一切装饰性动效与次要信息（只隐藏装饰层本身，绝不动内容容器） */
 :root[data-focus="on"] .decor,
-:root[data-focus="on"] .hero-canvas,
-:root[data-focus="on"] .noise {
+:root[data-focus="on"] .hero-canvas {
   display: none !important;
 }
-:root[data-focus="on"] {
-  --c-bg: #000;
-  --c-bg-raised: #0b0b0d;
+/* 噪点纹理是 body 的伪元素，专注模式下关闭伪元素而不是 body 本身 */
+:root[data-focus="on"] body.has-noise::after,
+:root[data-focus="on"] .has-noise::after {
+  display: none !important;
+  content: none !important;
 }
+/* 专注模式不改变用户选择的深浅色，只关掉动效与装饰层 */
 :root[data-focus="on"] * {
   animation-duration: 0.001ms !important;
   animation-iteration-count: 1 !important;
