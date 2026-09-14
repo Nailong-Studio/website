@@ -18,6 +18,9 @@ const related = byCategory(item.category)
   .filter((a) => a.id !== item.id)
   .slice(0, 6)
 
+// 与 ArtCard 一致的跨页共享元素名（封面卡片 → 详情主图无缝放大）
+const vtName = `art-${item.category}-${item.slug.replace(/[^\p{L}\p{N}_-]/gu, "-")}`
+
 const displayTitle = item.variant ? `${item.title} · ${item.variant}` : item.title
 const ld = {
   "@context": "https://schema.org",
@@ -84,6 +87,7 @@ const crumbs = {
             decoding="async"
             fetchpriority="high"
             data-fade
+            transition:name={vtName}
           />
         </a>
         <p class="eyebrow" style="margin-top:var(--s-3)">点击图片进入全屏预览 · 大图按屏幕宽度实时转码</p>

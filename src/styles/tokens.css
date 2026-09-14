@@ -28,9 +28,10 @@
 
   /* --- 字体（自托管可变字体，0 第三方请求） ---
      拉丁文用 Fraunces（高对比光学衬线，文艺唯美）作展示体、Space Grotesk 作正文；
-     中文回退到系统宋体/黑体（中文 Web 字体体积过大，刻意不下载，保持零追踪）。 */
-  --f-sans: "Space Grotesk", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", system-ui, sans-serif;
-  --f-display: "Fraunces Variable", "Songti SC", "STSong", "SimSun", "PingFang SC", "Microsoft YaHei", serif;
+     中文回退到国产/系统无衬线字体栈（HarmonyOS Sans / MiSans / 苹方 / 思源黑体），
+     刻意不下载中文 Web 字体（体积过大），运行时零外部字体请求。 */
+  --f-sans: "Space Grotesk", "HarmonyOS Sans SC", "MiSans", "OPPO Sans", "PingFang SC", "Hiragino Sans GB", "Source Han Sans SC", "Noto Sans CJK SC", "Microsoft YaHei", system-ui, sans-serif;
+  --f-display: "Fraunces Variable", "HarmonyOS Sans SC", "MiSans", "PingFang SC", "Source Han Sans SC", "Noto Sans CJK SC", "Microsoft YaHei", serif;
   --f-mono: "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
 
   --fs-xs: 0.75rem;

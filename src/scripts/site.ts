@@ -7,9 +7,14 @@
    5. 图片加载淡入
    6. 灯箱（原生 <dialog>，键盘可达）
    7. 画廊即时过滤（chips 为真实链接，JS 可用时接管）
+   ...
+   与 Astro ClientRouter（View Transitions）协作：
+   - astro:after-swap 恢复用户偏好与 html 标记
+   - astro:page-load / DOMContentLoaded 触发 boot（同一文档幂等）
+   - 全局 listener 统一挂 AbortSignal，换页后自动清理重绑
    ============================================================ */
 
-const doc = document.documentElement
+let doc = document.documentElement
 const STORE = { theme: "nl:theme", focus: "nl:focus" } as const
 
 /* ---------- 1. 主题 / 专注模式 ---------- */
@@ -56,7 +61,7 @@ function pauseDecor(paused: boolean) {
 }
 
 /* ---------- 2. 抽屉菜单 ---------- */
-function initDrawer() {
+function initDrawer(sig: AbortSignal) {
   const drawer = document.querySelector<HTMLElement>("[data-drawer]")
   const toggle = document.querySelector<HTMLButtonElement>("[data-drawer-toggle]")
   if (!drawer || !toggle) return
@@ -69,9 +74,13 @@ function initDrawer() {
   setOpen(false)
   toggle.addEventListener("click", () => setOpen(drawer.dataset.open !== "true"))
   drawer.querySelectorAll("a").forEach((a) => a.addEventListener("click", () => setOpen(false)))
-  document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && drawer.dataset.open === "true") setOpen(false)
-  })
+  document.addEventListener(
+    "keydown",
+    (e) => {
+      if (e.key === "Escape" && drawer.dataset.open === "true") setOpen(false)
+    },
+    { signal: sig }
+  )
 }
 
 /* ---------- 3. 滚动进场 ---------- */
@@ -100,7 +109,7 @@ function initReveal() {
 }
 
 /* ---------- 4. 阅读进度 ---------- */
-function initProgress() {
+function initProgress(sig: AbortSignal) {
   const bar = document.querySelector<HTMLElement>(".progress")
   if (!bar) return
   let raf = 0
@@ -120,7 +129,7 @@ function initProgress() {
       if (!raf) raf = requestAnimationFrame(update)
       syncNav()
     },
-    { passive: true }
+    { passive: true, signal: sig }
   )
   update()
   syncNav()
@@ -157,7 +166,7 @@ function collectItems(scope: ParentNode): LBItem[] {
   return Array.from(scope.querySelectorAll<HTMLElement>("[data-lb]")).map(toItem)
 }
 
-function initLightbox() {
+function initLightbox(sig: AbortSignal) {
   const dlg = document.querySelector<HTMLDialogElement>("[data-lightbox]")
   if (!dlg || typeof dlg.showModal !== "function") return
   const img = dlg.querySelector<HTMLImageElement>(".lightbox__img")!
@@ -198,23 +207,27 @@ function initLightbox() {
     render()
   }
 
-  document.addEventListener("click", (e) => {
-    const trigger = (e.target as HTMLElement).closest<HTMLElement>("[data-lb]")
-    if (trigger) {
-      e.preventDefault()
-      const scope = trigger.closest<HTMLElement>("[data-lb-scope]") ?? document
-      const els = Array.from(scope.querySelectorAll<HTMLElement>("[data-lb]"))
-      const idx = Math.max(0, els.indexOf(trigger))
-      open(els.map(toItem), idx)
-      return
-    }
-    // 详情页大图也复用灯箱
-    const solo = (e.target as HTMLElement).closest<HTMLElement>("[data-lb-solo]")
-    if (solo) {
-      e.preventDefault()
-      open(collectItems(solo.parentElement ?? document), 0)
-    }
-  })
+  document.addEventListener(
+    "click",
+    (e) => {
+      const trigger = (e.target as HTMLElement).closest<HTMLElement>("[data-lb]")
+      if (trigger) {
+        e.preventDefault()
+        const scope = trigger.closest<HTMLElement>("[data-lb-scope]") ?? document
+        const els = Array.from(scope.querySelectorAll<HTMLElement>("[data-lb]"))
+        const idx = Math.max(0, els.indexOf(trigger))
+        open(els.map(toItem), idx)
+        return
+      }
+      // 详情页大图也复用灯箱
+      const solo = (e.target as HTMLElement).closest<HTMLElement>("[data-lb-solo]")
+      if (solo) {
+        e.preventDefault()
+        open(collectItems(solo.parentElement ?? document), 0)
+      }
+    },
+    { signal: sig }
+  )
 
   dlg.querySelector("[data-lb-prev]")?.addEventListener("click", () => step(-1))
   dlg.querySelector("[data-lb-next]")?.addEventListener("click", () => step(1))
@@ -233,7 +246,7 @@ function initLightbox() {
 }
 
 /* ---------- 8. 光标柔光斑（桌面 + 非减弱动效） ---------- */
-function initCursorGlow() {
+function initCursorGlow(sig: AbortSignal) {
   const g = document.querySelector<HTMLElement>(".cursor-glow")
   if (!g) return
   if (!matchMedia("(pointer: fine)").matches) return
@@ -257,12 +270,12 @@ function initCursorGlow() {
       ty = e.clientY
       if (!raf) raf = requestAnimationFrame(tick)
     },
-    { passive: true }
+    { passive: true, signal: sig }
   )
 }
 
 /* ---------- 9. 画廊即时过滤 ---------- */
-function initFilter() {
+function initFilter(sig: AbortSignal) {
   const bar = document.querySelector<HTMLElement>("[data-filterbar]")
   const grid = document.querySelector<HTMLElement>("[data-grid]")
   if (!bar || !grid) return
@@ -315,7 +328,7 @@ function initFilter() {
     e.preventDefault()
     apply(chip.dataset.chip!, true)
   })
-  addEventListener("popstate", () => apply(currentCategory(), false))
+  addEventListener("popstate", () => apply(currentCategory(), false), { signal: sig })
 
   function currentCategory(): string {
     const m = location.pathname.match(/gallery\/([a-z]+)\/?$/)
@@ -352,7 +365,7 @@ function initCountUp() {
 }
 
 /* ---------- 11. 详情页键盘翻页（← / → 跳上/下一件；灯箱打开时让行） ---------- */
-function initArtworkPager() {
+function initArtworkPager(sig: AbortSignal) {
   const prev = document.querySelector<HTMLAnchorElement>("[data-pager-prev]")
   const next = document.querySelector<HTMLAnchorElement>("[data-pager-next]")
   if (!prev && !next) return
@@ -361,35 +374,66 @@ function initArtworkPager() {
     const href = el?.getAttribute("href")
     if (href) location.href = href
   }
-  addEventListener("keydown", (e) => {
-    if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return
-    if (dlg && dlg.open) return
-    if (e.metaKey || e.ctrlKey || e.altKey) return
-    const t = e.target as HTMLElement | null
-    if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA")) return
-    if (e.key === "ArrowLeft" && prev) {
-      e.preventDefault()
-      go(prev)
-    } else if (e.key === "ArrowRight" && next) {
-      e.preventDefault()
-      go(next)
-    }
-  })
+  addEventListener(
+    "keydown",
+    (e) => {
+      if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return
+      if (dlg && dlg.open) return
+      if (e.metaKey || e.ctrlKey || e.altKey) return
+      const t = e.target as HTMLElement | null
+      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA")) return
+      if (e.key === "ArrowLeft" && prev) {
+        e.preventDefault()
+        go(prev)
+      } else if (e.key === "ArrowRight" && next) {
+        e.preventDefault()
+        go(next)
+      }
+    },
+    { signal: sig }
+  )
 }
 
-/* ---------- 启动 ---------- */
+/* ---------- 启动（同一文档幂等；ClientRouter 换页后自动重跑） ---------- */
+let bootAC: AbortController | null = null
+
 function boot() {
+  // 同一个文档只初始化一次；换页后 html 元素被替换，dataset 自然重置
+  if (doc.dataset.booted === "1") return
+  doc.dataset.booted = "1"
+
+  // 清理上一页挂在 window/document 上的全局 listener，防止重复触发
+  bootAC?.abort()
+  bootAC = new AbortController()
+  const sig = bootAC.signal
+
+  // 换页可能带走了打开的灯箱状态
+  document.body.style.overflow = ""
+
   initToggles()
-  initDrawer()
+  initDrawer(sig)
   initReveal()
-  initProgress()
+  initProgress(sig)
   initImageFade()
-  initLightbox()
-  initFilter()
-  initCursorGlow()
+  initLightbox(sig)
+  initFilter(sig)
+  initCursorGlow(sig)
   initCountUp()
-  initArtworkPager()
+  initArtworkPager(sig)
 }
 
+/* ClientRouter 换页：html 元素被替换成新页面的服务端默认值，
+   此处立即恢复用户偏好与 JS 标记，避免主题闪烁 */
+document.addEventListener("astro:after-swap", () => {
+  doc = document.documentElement
+  doc.classList.add("js")
+  const t = readPref(STORE.theme)
+  if (t) doc.dataset.theme = t
+  const f = readPref(STORE.focus)
+  if (f) doc.dataset.focus = f
+})
+
+/* 首次加载（DOMContentLoaded）与每次 ClientRouter 导航（astro:page-load）都会触发 */
+document.addEventListener("astro:page-load", boot)
 if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot)
 else boot()

@@ -1267,3 +1267,32 @@ main p a:hover,
     transform: scaleY(1);
   }
 }
+
+/* ============================================================
+   View Transitions（ClientRouter 跨页过渡）
+   - root：旧页快速淡出、新页缓出淡入，衔接柔和不拖沓
+   - 共享元素（画廊封面 → 详情主图）走默认 morph：自带缩放位移
+   - 减弱动效时由 ClientRouter 自行禁用，此处再用媒体查询双保险
+   ============================================================ */
+@media (prefers-reduced-motion: no-preference) {
+  ::view-transition-group(*) {
+    animation-duration: 0.4s;
+    animation-timing-function: var(--e-out);
+  }
+  ::view-transition-old(root) {
+    animation: 0.24s ease both vt-fade-out;
+  }
+  ::view-transition-new(root) {
+    animation: 0.36s var(--e-out) both vt-fade-in;
+  }
+  @keyframes vt-fade-out {
+    to {
+      opacity: 0;
+    }
+  }
+  @keyframes vt-fade-in {
+    from {
+      opacity: 0;
+    }
+  }
+}

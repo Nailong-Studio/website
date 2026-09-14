@@ -1,9 +1,13 @@
 ---
 import "../styles/global.css"
+import { ClientRouter } from "astro:transitions"
 import SiteNav from "../components/SiteNav.astro"
 import SiteFooter from "../components/SiteFooter.astro"
 import Lightbox from "../components/Lightbox.astro"
 import { url } from "../lib/url"
+// 字体 ?url 导入：构建后得到带 hash 的同域资源地址，用于 preload（与 fontsource CSS 内引用同一文件）
+import frauncesWoff from "@fontsource-variable/fraunces/files/fraunces-latin-full-normal.woff2?url"
+import groteskWoff from "@fontsource-variable/space-grotesk/files/space-grotesk-latin-wght-normal.woff2?url"
 
 export interface Props {
   title: string
@@ -75,6 +79,13 @@ const extraLd = jsonLd ? (Array.isArray(jsonLd) ? jsonLd : [jsonLd]) : []
     <link rel="icon" href={url("favicon.svg")} type="image/svg+xml" />
     <link rel="alternate" hreflang="zh-CN" href={canonical} />
     <link rel="sitemap" href={url("sitemap-index.xml")} />
+
+    {/* 首屏关键字体 preload（同域自托管，非第三方字体服务；?url 导入已含 base 前缀） */}
+    <link rel="preload" as="font" type="font/woff2" href={frauncesWoff} crossorigin />
+    <link rel="preload" as="font" type="font/woff2" href={groteskWoff} crossorigin />
+
+    {/* 跨页面 View Transitions：画廊封面与详情主图共享元素过渡 */}
+    <ClientRouter />
 
     <script
       is:inline
