@@ -36,6 +36,8 @@ function initToggles() {
     writePref(STORE.theme, next)
     themeBtn.setAttribute("aria-pressed", String(next === "light"))
     themeBtn.setAttribute("aria-label", next === "light" ? "切换到深色模式" : "切换到浅色模式")
+    doc.classList.add("theme-anim")
+    window.setTimeout(() => doc.classList.remove("theme-anim"), 480)
   })
 
   const focusBtn = document.querySelector<HTMLButtonElement>("[data-toggle-focus]")
@@ -108,14 +110,20 @@ function initProgress() {
     const p = max > 0 ? Math.min(1, Math.max(0, scrollY / max)) : 0
     bar.style.setProperty("--p", p.toFixed(4))
   }
+  const nav = document.querySelector<HTMLElement>(".site-nav")
+  const syncNav = () => {
+    if (nav) nav.classList.toggle("is-scrolled", scrollY > 12)
+  }
   addEventListener(
     "scroll",
     () => {
       if (!raf) raf = requestAnimationFrame(update)
+      syncNav()
     },
     { passive: true }
   )
   update()
+  syncNav()
 }
 
 /* ---------- 5. 图片淡入 ---------- */
@@ -224,7 +232,36 @@ function initLightbox() {
   })
 }
 
-/* ---------- 7. 画廊即时过滤 ---------- */
+/* ---------- 8. 光标柔光斑（桌面 + 非减弱动效） ---------- */
+function initCursorGlow() {
+  const g = document.querySelector<HTMLElement>(".cursor-glow")
+  if (!g) return
+  if (!matchMedia("(pointer: fine)").matches) return
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) return
+  let x = innerWidth / 2
+  let y = innerHeight / 2
+  let tx = x
+  let ty = y
+  let raf = 0
+  const tick = () => {
+    raf = 0
+    x += (tx - x) * 0.18
+    y += (ty - y) * 0.18
+    g.style.transform = `translate(${x}px, ${y}px)`
+    if (Math.abs(tx - x) > 0.4 || Math.abs(ty - y) > 0.4) raf = requestAnimationFrame(tick)
+  }
+  addEventListener(
+    "pointermove",
+    (e) => {
+      tx = e.clientX
+      ty = e.clientY
+      if (!raf) raf = requestAnimationFrame(tick)
+    },
+    { passive: true }
+  )
+}
+
+/* ---------- 9. 画廊即时过滤 ---------- */
 function initFilter() {
   const bar = document.querySelector<HTMLElement>("[data-filterbar]")
   const grid = document.querySelector<HTMLElement>("[data-grid]")
@@ -237,7 +274,6 @@ function initFilter() {
     let shown = 0
     for (const card of cards) {
       const hit = cat === "all" || card.dataset.cat === cat
-      card.hidden = !hit
       if (hit) shown++
     }
     chips.forEach((c) => {
@@ -250,6 +286,27 @@ function initFilter() {
       if (target) history.pushState({ cat }, "", target)
     }
     document.dispatchEvent(new CustomEvent("nl:filtered", { detail: { cat, shown } }))
+
+    const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches
+    if (reduce) {
+      for (const card of cards) card.hidden = !(cat === "all" || card.dataset.cat === cat)
+      return
+    }
+    grid.classList.add("is-filtering")
+    window.setTimeout(() => {
+      let i = 0
+      for (const card of cards) {
+        const hit = cat === "all" || card.dataset.cat === cat
+        card.hidden = !hit
+        if (hit) {
+          card.classList.remove("is-enter")
+          void card.offsetWidth
+          card.style.setProperty("--enter-i", String(i++))
+          card.classList.add("is-enter")
+        }
+      }
+      grid.classList.remove("is-filtering")
+    }, 220)
   }
 
   bar.addEventListener("click", (e) => {
@@ -267,6 +324,59 @@ function initFilter() {
   // 初始状态由服务端渲染决定，无需重复过滤
 }
 
+/* ---------- 10. 数字滚动计数（hero 统计） ---------- */
+function initCountUp() {
+  const els = document.querySelectorAll<HTMLElement>("[data-countup]")
+  if (!els.length) return
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches
+  if (reduce) return
+  els.forEach((el) => {
+    const txt = el.textContent ?? ""
+    const m = txt.match(/^([^\d]*)([\d.,]+)(.*)$/s)
+    if (!m) return
+    const pre = m[1]
+    const numStr = m[2].replace(/,/g, "")
+    const post = m[3]
+    const target = Number(numStr)
+    if (!isFinite(target) || target <= 0) return
+    const dur = 1100
+    const start = performance.now()
+    const tick = (now: number) => {
+      const p = Math.min(1, (now - start) / dur)
+      const e = 1 - Math.pow(1 - p, 3)
+      el.textContent = pre + Math.round(target * e).toLocaleString("en-US") + post
+      if (p < 1) requestAnimationFrame(tick)
+    }
+    requestAnimationFrame(tick)
+  })
+}
+
+/* ---------- 11. 详情页键盘翻页（← / → 跳上/下一件；灯箱打开时让行） ---------- */
+function initArtworkPager() {
+  const prev = document.querySelector<HTMLAnchorElement>("[data-pager-prev]")
+  const next = document.querySelector<HTMLAnchorElement>("[data-pager-next]")
+  if (!prev && !next) return
+  const dlg = document.querySelector<HTMLDialogElement>("[data-lightbox]")
+  const go = (el: HTMLAnchorElement | null) => {
+    const href = el?.getAttribute("href")
+    if (href) location.href = href
+  }
+  addEventListener("keydown", (e) => {
+    if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return
+    if (dlg && dlg.open) return
+    if (e.metaKey || e.ctrlKey || e.altKey) return
+    const t = e.target as HTMLElement | null
+    if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA")) return
+    if (e.key === "ArrowLeft" && prev) {
+      e.preventDefault()
+      go(prev)
+    } else if (e.key === "ArrowRight" && next) {
+      e.preventDefault()
+      go(next)
+    }
+  })
+}
+
 /* ---------- 启动 ---------- */
 function boot() {
   initToggles()
@@ -276,6 +386,9 @@ function boot() {
   initImageFade()
   initLightbox()
   initFilter()
+  initCursorGlow()
+  initCountUp()
+  initArtworkPager()
 }
 
 if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot)

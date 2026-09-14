@@ -83,6 +83,7 @@ const crumbs = {
             alt={`${displayTitle} —— ${theme.name}展品`}
             decoding="async"
             fetchpriority="high"
+            data-fade
           />
         </a>
         <p class="eyebrow" style="margin-top:var(--s-3)">点击图片进入全屏预览 · 大图按屏幕宽度实时转码</p>
@@ -122,14 +123,14 @@ const crumbs = {
     <nav class="section" aria-label="展厅内翻页" style="display:flex;gap:var(--s-3);justify-content:space-between;flex-wrap:wrap">
       {
         prev ? (
-          <a class="btn" href={url(`/artwork/${prev.category}/${prev.slug}/`)}>← {prev.title}</a>
+          <a class="btn" href={url(`/artwork/${prev.category}/${prev.slug}/`)} data-pager-prev>← {prev.title}</a>
         ) : (
           <span />
         )
       }
       {
         next ? (
-          <a class="btn" href={url(`/artwork/${next.category}/${next.slug}/`)}>{next.title} →</a>
+          <a class="btn" href={url(`/artwork/${next.category}/${next.slug}/`)} data-pager-next>{next.title} →</a>
         ) : (
           <span />
         )

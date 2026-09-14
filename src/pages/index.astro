@@ -25,26 +25,30 @@ const ld = {
   <section class="hero">
     <HeroCanvas />
     <div class="wrap hero__inner">
-      <p class="eyebrow" data-reveal>NAILONG ART UNIVERSE · EST. 2026</p>
-      <h1 class="hero__title" data-reveal>
+      <p class="eyebrow" data-hero-in style="--hero-delay:80ms">NAILONG ART UNIVERSE · EST. 2026</p>
+      <h1 class="hero__title">
         把奶龙，<em>放进</em><br />艺术史的每一格
       </h1>
-      <p class="hero__lede" data-reveal>
+      <p class="hero__lede" data-hero-in style="--hero-delay:220ms">
         {artworks.length} 件作品，五个展厅。从古典名画的戏仿，到动态壁纸的定格瞬间——
         每一张都以原图分辨率呈现，可放大、可下载、可带走。
       </p>
-      <div class="hero__cta" data-reveal>
+      <div class="hero__cta" data-hero-in style="--hero-delay:340ms">
         <a class="btn btn--primary" href={url("/gallery/")}>进入画廊 →</a>
         <a class="btn" href={url("/about/")}>这是什么项目</a>
       </div>
-      <div class="hero__stats" data-reveal>
-        <span><b>{artworks.length}</b>件作品</span>
-        <span><b>{categories.length}</b>个展厅</span>
-        <span><b>100%</b>原图直出</span>
-        <span><b>0</b>追踪脚本</span>
-      </div>
+      <div class="hero__stats" data-hero-in style="--hero-delay:460ms">
+        <span><b data-countup>{artworks.length}</b>件作品</span>
+        <span><b data-countup>{categories.length}</b>个展厅</span>
+        <span><b data-countup>100%</b>原图直出</span>
+        <span><b data-countup>0</b>追踪脚本</span>
     </div>
-    <span class="scroll-hint" aria-hidden="true">SCROLL ↓</span>
+
+    <div class="hero__spectrum" aria-hidden="true" data-hero-in style="--hero-delay:580ms">
+      <i style="--t:#FFD54F"></i><i style="--t:#E8C48A"></i><i style="--t:#7FD1B9"></i><i style="--t:#9BB7FF"></i><i style="--t:#FF9FB2"></i>
+    </div>
+  </div>
+  <span class="scroll-hint" aria-hidden="true">SCROLL ↓</span>
   </section>
 
   <ThemeRail />
