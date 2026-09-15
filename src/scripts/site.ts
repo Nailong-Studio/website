@@ -394,6 +394,141 @@ function initArtworkPager(sig: AbortSignal) {
   )
 }
 
+/* ---------- 12. 沉浸式漫游 Story（/story）：一屏一图 + 滚动换屏 + 进度条 ---------- */
+function initStory(sig: AbortSignal) {
+  const root = document.querySelector<HTMLElement>("[data-story]")
+  if (!root) return
+  const panes = Array.from(root.querySelectorAll<HTMLElement>("[data-pane]"))
+  const progress = root.querySelector<HTMLElement>("[data-story-progress]")
+  const hint = root.querySelector<HTMLElement>("[data-story-hint]")
+  if (!panes.length) return
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches
+  let active = -1
+  let raf = 0
+
+  const update = () => {
+    raf = 0
+    const vh = innerHeight
+    const at = scrollY + vh / 2
+    let idx = 0
+    for (let i = 0; i < panes.length; i++) {
+      const top = panes[i].offsetTop
+      const bottom = top + panes[i].offsetHeight
+      if (at >= top && at < bottom) {
+        idx = i
+        break
+      }
+      if (at < top) break
+    }
+    if (idx !== active) {
+      if (active >= 0) panes[active].dataset.active = "false"
+      active = idx
+      panes[active].dataset.active = "true"
+      for (let i = 0; i < panes.length; i++) {
+        panes[i].dataset.exited = String(i < active)
+      }
+    }
+    if (progress) {
+      const p = Math.min(1, (scrollY + vh) / (document.documentElement.scrollHeight - vh || 1))
+      progress.style.scale = `${p} 1`
+    }
+    if (hint) hint.dataset.hidden = String(scrollY > vh * 0.4)
+  }
+  addEventListener(
+    "scroll",
+    () => {
+      if (!raf) raf = requestAnimationFrame(update)
+    },
+    { passive: true, signal: sig }
+  )
+  addEventListener("resize", update, { passive: true, signal: sig })
+  update()
+  if (reduce) {
+    panes.forEach((p) => {
+      p.dataset.active = "true"
+      p.dataset.exited = "false"
+    })
+  }
+}
+
+/* ---------- 13. 背景音乐（Web Audio 自合成 ambient，零外部资源） ---------- */
+function initMusic() {
+  const btn = document.querySelector<HTMLButtonElement>("[data-music]")
+  if (!btn) return
+  let ctx: AudioContext | null = null
+  let master: GainNode | null = null
+  let nodes: AudioNode[] = []
+  let playing = false
+
+  const stop = () => {
+    nodes.forEach((n) => {
+      try {
+        n.disconnect()
+      } catch {
+        /* ignore */
+      }
+    })
+    nodes = []
+    if (master) {
+      master.disconnect()
+      master = null
+    }
+    if (ctx) {
+      ctx.close().catch(() => {})
+      ctx = null
+    }
+    playing = false
+    btn.dataset.playing = "false"
+    btn.setAttribute("aria-pressed", "false")
+    btn.setAttribute("aria-label", "播放背景音乐")
+  }
+
+  const start = () => {
+    if (playing) return stop()
+    const Ctor = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
+    if (!Ctor) return
+    ctx = new Ctor()
+    const ac = ctx
+    master = ac.createGain()
+    master.gain.value = 0
+    master.connect(ac.destination)
+    // 渐进淡入，避免突兀
+    master.gain.linearRampToValueAtTime(0.16, ac.currentTime + 2.5)
+
+    const now = ac.currentTime
+    const chord = [220.0, 277.18, 329.63, 415.3] // A3 · C#4 · E4 · G#4（暖色调和弦）
+    const oscs = chord.map((f, i) => {
+      const o = ac.createOscillator()
+      o.type = i % 2 === 0 ? "sine" : "triangle"
+      o.frequency.value = f
+      const g = ac.createGain()
+      g.gain.value = 0.22 / chord.length
+      // 极慢的 LFO 让每个音有呼吸感
+      const lfo = ac.createOscillator()
+      lfo.frequency.value = 0.05 + i * 0.03
+      const lfoGain = ac.createGain()
+      lfoGain.gain.value = 0.08
+      lfo.connect(lfoGain)
+      lfoGain.connect(g.gain)
+      o.connect(g)
+      g.connect(master!)
+      o.start(now + i * 0.4)
+      lfo.start(now + i * 0.4)
+      return o
+    })
+    nodes.push(...oscs)
+    playing = true
+    btn.dataset.playing = "true"
+    btn.setAttribute("aria-pressed", "true")
+    btn.setAttribute("aria-label", "停止背景音乐")
+  }
+
+  btn.addEventListener("click", () => {
+    // 首次点击必须由用户手势触发，浏览器才允许出声
+    start()
+  })
+}
+
 /* ---------- 启动（同一文档幂等；ClientRouter 换页后自动重跑） ---------- */
 let bootAC: AbortController | null = null
 
@@ -420,6 +555,8 @@ function boot() {
   initCursorGlow(sig)
   initCountUp()
   initArtworkPager(sig)
+  initStory(sig)
+  initMusic()
 }
 
 /* ClientRouter 换页：html 元素被替换成新页面的服务端默认值，

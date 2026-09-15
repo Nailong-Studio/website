@@ -1,0 +1,24 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro"
+import StoryView from "../components/StoryView.astro"
+import { artworks } from "../lib/artworks"
+import { url } from "../lib/url"
+
+const pick = [...artworks].sort((a, b) => (a.id < b.id ? -1 : 1)).slice(0, 24)
+
+const ld = {
+  "@context": "https://schema.org",
+  "@type": "CollectionPage",
+  name: "奶龙艺术宇宙 · 沉浸式漫游",
+  description: `逐屏浏览 ${pick.length} 件精选作品：每屏一幅、附创作手记，滚动即换屏。`,
+  isPartOf: { "@type": "WebSite", name: "奶龙艺术宇宙" },
+}
+---
+
+<BaseLayout
+  title="沉浸式漫游 · 奶龙艺术宇宙"
+  description={`逐屏浏览精选作品：每屏一幅、附特别字体的创作手记，滚动换屏。`}
+  jsonLd={ld}
+>
+  <StoryView items={pick} />
+</BaseLayout>
