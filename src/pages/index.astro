@@ -6,6 +6,7 @@ import MasonryGrid from "../components/MasonryGrid.astro"
 import { artworks, categories, featured } from "../lib/artworks"
 import { url } from "../lib/url"
 
+const heroVideo = url("/video/nailong-hero.mp4")
 const picks = featured(9)
 
 const ld = {
@@ -23,6 +24,17 @@ const ld = {
   jsonLd={ld}
 >
   <section class="hero">
+    <video
+      class="hero__video decor"
+      src={heroVideo}
+      autoplay
+      muted
+      loop
+      playsinline
+      preload="metadata"
+      aria-hidden="true"
+      tabindex="-1"
+    ></video>
     <HeroCanvas />
     <div class="wrap hero__inner">
       <p class="eyebrow" data-hero-in style="--hero-delay:80ms">NAILONG ART UNIVERSE · EST. 2026</p>
