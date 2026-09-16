@@ -29,7 +29,7 @@ const OUT_JSON = path.join(ROOT, "src/data/manifest.json")
 const THUMB_ROOT = path.join(ROOT, "public/thumbs")
 const CACHE_DIR = path.join(ROOT, ".cache/lqip")
 
-// 原图 CDN：GitHub raw 作为唯一来源，wsrv.nl 负责按需转码/缩放
+// 原图 CDN：GitHub raw 作为唯一来源，wsrv.nl 负责按需转码
 const RAW_BASE = "https://raw.githubusercontent.com/Nailong-Studio/wallpaper/main"
 const CDN_BASE = "https://wsrv.nl/"
 const CDN_WIDTHS = [640, 1024, 1600, 2048]
@@ -70,7 +70,14 @@ function slugify(stem) {
 
 function cdnUrl(srcPath, w) {
   const raw = `${RAW_BASE}/${srcPath}`
-  const qs = new URLSearchParams({ url: raw.replace(/^https?:\/\//, ""), w: String(w), output: "webp", q: "75" })
+  const qs = new URLSearchParams({ url: raw.replace(/^https?:\/\//, ""), w: String(w), output: "webp", q: "82" })
+  return `${CDN_BASE}?${qs.toString()}`
+}
+
+/** 原分辨率展示图：不传 w，保持图片原始像素，仅转码 WebP（q82，接近无损但体积仅为 PNG 1/10 左右） */
+function cdnFullUrl(srcPath) {
+  const raw = `${RAW_BASE}/${srcPath}`
+  const qs = new URLSearchParams({ url: raw.replace(/^https?:\/\//, ""), output: "webp", q: "82" })
   return `${CDN_BASE}?${qs.toString()}`
 }
 
@@ -129,9 +136,10 @@ async function main() {
       thumb: g.thumb,
       // 原始文件（GitHub raw，6–10MB，仅用于"原始文件"下载入口）
       full: `${RAW_BASE}/${g.src.replace(/^wallpapers\//, "")}`,
-      // 展示用大图：走 CDN 转码（2048px WebP），避免直接拉 6–10MB PNG
-      view: cdnUrl(g.src.replace(/^wallpapers\//, ""), 2048),
-      fullSrcset: CDN_WIDTHS.map((w) => `${cdnUrl(g.src.replace(/^wallpapers\//, ""), w)} ${w}w`).join(", "),
+      // 展示用大图：原分辨率 WebP（保持原始像素，画质接近原图）
+      view: cdnFullUrl(g.src.replace(/^wallpapers\//, "")),
+      // srcset：覆盖小到大各档位，最高档 = 原图宽度，浏览器按容器挑最清晰档
+      fullSrcset: [...CDN_WIDTHS, g.w].filter((w, i, a) => a.indexOf(w) === i).map((w) => `${cdnUrl(g.src.replace(/^wallpapers\//, ""), w)} ${w}w`).join(", "),
       w: g.w,
       h: g.h,
       size: g.size,
