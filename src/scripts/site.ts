@@ -394,17 +394,45 @@ function initArtworkPager(sig: AbortSignal) {
   )
 }
 
-/* ---------- 12. 沉浸式漫游 Story（/story）：一屏一图 + 滚动换屏 + 进度条 ---------- */
+/* ---------- 12. 沉浸式漫游 Story（/story）：一屏一图 + 滚动换屏 + 横向长廊 + 进度条 ---------- */
 function initStory(sig: AbortSignal) {
   const root = document.querySelector<HTMLElement>("[data-story]")
   if (!root) return
   const panes = Array.from(root.querySelectorAll<HTMLElement>("[data-pane]"))
   const progress = root.querySelector<HTMLElement>("[data-story-progress]")
   const hint = root.querySelector<HTMLElement>("[data-story-hint]")
-  if (!panes.length) return
+  // 横向长廊：横幅作品左右滑动
+  const hall = root.querySelector<HTMLElement>("[data-hall]")
+  const hallTrack = hall?.querySelector<HTMLElement>("[data-hall-track]") ?? null
+  const slides = hallTrack ? Array.from(hallTrack.children) as HTMLElement[] : []
   const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches
   let active = -1
+  let slideActive = -1
   let raf = 0
+
+  const updateHall = () => {
+    if (!hallTrack || !slides.length) return
+    // 使用视口坐标系（getBoundingClientRect），避免 offsetParent 不一致导致错位
+    const viewMid = hallTrack.getBoundingClientRect().left + hallTrack.clientWidth / 2
+    let idx = 0
+    let best = Infinity
+    for (let i = 0; i < slides.length; i++) {
+      const r = slides[i].getBoundingClientRect()
+      const mid = r.left + r.width / 2
+      const d = Math.abs(mid - viewMid)
+      if (d < best) {
+        best = d
+        idx = i
+      }
+    }
+    if (idx !== slideActive) {
+      const prev = slideActive
+      if (slideActive >= 0) slides[slideActive].dataset.active = "false"
+      slideActive = idx
+      slides[idx].dataset.active = "true"
+      slides[idx].style.setProperty("--dir", String(idx > prev ? 1 : idx < prev ? -1 : 1))
+    }
+  }
 
   const update = () => {
     raf = 0
@@ -428,8 +456,16 @@ function initStory(sig: AbortSignal) {
         panes[i].dataset.exited = String(i < active)
       }
     }
+    updateHall()
     if (progress) {
-      const p = Math.min(1, (scrollY + vh) / (document.documentElement.scrollHeight - vh || 1))
+      // 总进度 = 纵向滚动 + 横向长廊内折算
+      const doc = document.documentElement.scrollHeight
+      const scrollable = Math.max(1, doc - vh)
+      let p = Math.min(1, Math.max(0, (scrollY + vh) / scrollable))
+      if (hall && hallTrack && hallTrack.scrollWidth > hallTrack.clientWidth) {
+        const h = hallTrack.scrollLeft / (hallTrack.scrollWidth - hallTrack.clientWidth)
+        p = Math.min(1, p + h * (hall.offsetHeight / scrollable) * 0.6)
+      }
       progress.style.scale = `${p} 1`
     }
     if (hint) hint.dataset.hidden = String(scrollY > vh * 0.4)
@@ -441,6 +477,15 @@ function initStory(sig: AbortSignal) {
     },
     { passive: true, signal: sig }
   )
+  if (hallTrack) {
+    hallTrack.addEventListener(
+      "scroll",
+      () => {
+        if (!raf) raf = requestAnimationFrame(update)
+      },
+      { passive: true, signal: sig }
+    )
+  }
   addEventListener("resize", update, { passive: true, signal: sig })
   update()
   if (reduce) {
@@ -448,85 +493,106 @@ function initStory(sig: AbortSignal) {
       p.dataset.active = "true"
       p.dataset.exited = "false"
     })
+    slides.forEach((s) => (s.dataset.active = "true"))
   }
 }
 
-/* ---------- 13. 背景音乐（Web Audio 自合成 ambient，零外部资源） ---------- */
-function initMusic() {
-  const btn = document.querySelector<HTMLButtonElement>("[data-music]")
-  if (!btn) return
-  let ctx: AudioContext | null = null
-  let master: GainNode | null = null
-  let nodes: AudioNode[] = []
-  let playing = false
-
-  const stop = () => {
-    nodes.forEach((n) => {
+/* ---------- 13. 背景音乐（Web Audio 模块级单例：跨页保活、零外部资源） ---------- */
+const audio = {
+  ctx: null as AudioContext | null,
+  master: null as GainNode | null,
+  nodes: [] as AudioNode[],
+  playing: false,
+  toggle() {
+    this.playing ? this.stop() : this.start()
+  },
+  start() {
+    if (this.playing) return
+    const Ctor = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
+    if (!Ctor) return
+    if (!this.ctx) this.ctx = new Ctor()
+    const ac = this.ctx
+    // iOS/移动端：首次手势后 AudioContext 常在 suspended，需要手动 resume
+    if (ac.state === "suspended") void ac.resume()
+    if (!this.master) {
+      const m = ac.createGain()
+      m.gain.value = 0
+      m.connect(ac.destination)
+      this.master = m
+    }
+    this.master.gain.cancelScheduledValues(ac.currentTime)
+    this.master.gain.setValueAtTime(0, ac.currentTime)
+    this.master.gain.linearRampToValueAtTime(0.2, ac.currentTime + 2.2)
+    if (!this.nodes.length) {
+      const now = ac.currentTime
+      // 低八度根音 A2 + A3/C#4/E4/G#4 暖色和弦，音量比旧版更分明
+      const chord = [110.0, 220.0, 277.18, 329.63, 415.3]
+      chord.forEach((f, i) => {
+        const o = ac.createOscillator()
+        o.type = i === 0 ? "sine" : i % 2 === 0 ? "sine" : "triangle"
+        o.frequency.value = f
+        const g = ac.createGain()
+        g.gain.value = i === 0 ? 0.15 : 0.11 / (chord.length - 1)
+        // 极慢 LFO：每个音有轻微呼吸感
+        const lfo = ac.createOscillator()
+        lfo.frequency.value = 0.06 + i * 0.025
+        const lg = ac.createGain()
+        lg.gain.value = 0.05
+        lfo.connect(lg)
+        lg.connect(g.gain)
+        o.connect(g)
+        g.connect(this.master!)
+        o.start(now + i * 0.35)
+        lfo.start(now + i * 0.35)
+        this.nodes.push(o)
+      })
+    }
+    this.playing = true
+  },
+  stop() {
+    if (this.nodes.length) {
+      this.nodes.forEach((n) => {
+        try {
+          n.disconnect()
+        } catch {
+          /* ignore */
+        }
+      })
+      this.nodes = []
+    }
+    if (this.master) {
       try {
-        n.disconnect()
+        this.master.disconnect()
       } catch {
         /* ignore */
       }
-    })
-    nodes = []
-    if (master) {
-      master.disconnect()
-      master = null
+      this.master = null
     }
-    if (ctx) {
-      ctx.close().catch(() => {})
-      ctx = null
+    if (this.ctx) {
+      void this.ctx.close()
+      this.ctx = null
     }
-    playing = false
-    btn.dataset.playing = "false"
-    btn.setAttribute("aria-pressed", "false")
-    btn.setAttribute("aria-label", "播放背景音乐")
+    this.playing = false
+  },
+}
+
+function initMusic(sig: AbortSignal) {
+  const btn = document.querySelector<HTMLButtonElement>("[data-music]")
+  if (!btn) return
+  const sync = () => {
+    btn.dataset.playing = String(audio.playing)
+    btn.setAttribute("aria-pressed", String(audio.playing))
+    btn.setAttribute("aria-label", audio.playing ? "停止背景音乐" : "播放背景音乐")
   }
-
-  const start = () => {
-    if (playing) return stop()
-    const Ctor = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
-    if (!Ctor) return
-    ctx = new Ctor()
-    const ac = ctx
-    master = ac.createGain()
-    master.gain.value = 0
-    master.connect(ac.destination)
-    // 渐进淡入，避免突兀
-    master.gain.linearRampToValueAtTime(0.16, ac.currentTime + 2.5)
-
-    const now = ac.currentTime
-    const chord = [220.0, 277.18, 329.63, 415.3] // A3 · C#4 · E4 · G#4（暖色调和弦）
-    const oscs = chord.map((f, i) => {
-      const o = ac.createOscillator()
-      o.type = i % 2 === 0 ? "sine" : "triangle"
-      o.frequency.value = f
-      const g = ac.createGain()
-      g.gain.value = 0.22 / chord.length
-      // 极慢的 LFO 让每个音有呼吸感
-      const lfo = ac.createOscillator()
-      lfo.frequency.value = 0.05 + i * 0.03
-      const lfoGain = ac.createGain()
-      lfoGain.gain.value = 0.08
-      lfo.connect(lfoGain)
-      lfoGain.connect(g.gain)
-      o.connect(g)
-      g.connect(master!)
-      o.start(now + i * 0.4)
-      lfo.start(now + i * 0.4)
-      return o
-    })
-    nodes.push(...oscs)
-    playing = true
-    btn.dataset.playing = "true"
-    btn.setAttribute("aria-pressed", "true")
-    btn.setAttribute("aria-label", "停止背景音乐")
-  }
-
-  btn.addEventListener("click", () => {
-    // 首次点击必须由用户手势触发，浏览器才允许出声
-    start()
-  })
+  sync() // 换页回来时恢复按钮态（音乐跨页继续播）
+  btn.addEventListener(
+    "click",
+    () => {
+      audio.toggle()
+      sync()
+    },
+    { signal: sig }
+  )
 }
 
 /* ---------- 启动（同一文档幂等；ClientRouter 换页后自动重跑） ---------- */
@@ -556,7 +622,7 @@ function boot() {
   initCountUp()
   initArtworkPager(sig)
   initStory(sig)
-  initMusic()
+  initMusic(sig)
 }
 
 /* ClientRouter 换页：html 元素被替换成新页面的服务端默认值，

@@ -2,9 +2,12 @@
 import BaseLayout from "../layouts/BaseLayout.astro"
 import StoryView from "../components/StoryView.astro"
 import { artworks } from "../lib/artworks"
-import { url } from "../lib/url"
 
-const pick = [...artworks].sort((a, b) => (a.id < b.id ? -1 : 1)).slice(0, 24)
+// 按图片真实形状混搭选样：竖幅进「上下滚动」段，横幅进「横向长廊」段
+const sorted = [...artworks].sort((a, b) => (a.id < b.id ? -1 : 1))
+const portraitPicks = sorted.filter((a) => a.h >= a.w).slice(0, 14)
+const landscapePicks = sorted.filter((a) => a.w > a.h).slice(0, 10)
+const pick = [...portraitPicks, ...landscapePicks]
 
 const ld = {
   "@context": "https://schema.org",
