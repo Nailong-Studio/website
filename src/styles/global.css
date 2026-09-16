@@ -437,9 +437,9 @@ hr {
   height: 100%;
   object-fit: cover;
   z-index: -2;
-  opacity: 0.22;
+  opacity: 0.26;
   mix-blend-mode: screen;
-  filter: saturate(0.75) blur(0.5px);
+  filter: saturate(0.75) brightness(0.85) blur(0.5px);
   pointer-events: none;
 }
 :root[data-focus="on"] .hero__video {
@@ -456,13 +456,30 @@ hr {
 .hero__title {
   font-family: var(--f-display);
   font-weight: 540;
-  font-size: var(--fs-display);
-  line-height: 0.92;
-  letter-spacing: -0.035em;
+  /* 海报化：超大号 + 收紧字重曲线，宽度占满整行 */
+  font-size: clamp(3.2rem, 12.5vw, 10.5rem);
+  line-height: 0.9;
+  letter-spacing: -0.01em;
   font-variation-settings: "opsz" 144, "SOFT" 60, "WONK" 0, "wght" 540;
   margin: 0 0 var(--s-5);
   text-wrap: balance;
   text-shadow: 0 2px 40px rgb(0 0 0 / 0.35);
+}
+/* 入场：像幕布拉开一样浮现（自动播放，尊重减弱动效） */
+@keyframes heroTitleIn {
+  from {
+    opacity: 0;
+    transform: translateY(28px);
+    filter: blur(8px);
+  }
+}
+html.js .hero__title {
+  animation: heroTitleIn 1.1s var(--e-out) 0.15s both;
+}
+@media (prefers-reduced-motion: reduce) {
+  html.js .hero__title {
+    animation: none;
+  }
 }
 .hero__title em {
   font-style: normal;
@@ -499,6 +516,13 @@ hr {
   transform: translateY(-2px);
   border-color: var(--c-accent);
   box-shadow: var(--sh-accent);
+}
+.btn:active {
+  transform: translateY(0) scale(0.98);
+}
+.btn:focus-visible {
+  outline: 2px solid var(--c-accent);
+  outline-offset: 2px;
 }
 .btn--primary {
   background: var(--c-accent);
@@ -1230,6 +1254,13 @@ html.js .story__pane[data-active="true"] .story__pane-bg {
   border-radius: var(--r-lg);
   box-shadow: var(--sh-3), 0 0 80px rgb(255 213 79 / 0.14);
   border: 1px solid var(--c-border-soft);
+  /* 滚动即叙事：纵深视差由 JS 每帧写 --depth（transform-only） */
+  transform: translateY(var(--depth, 0px));
+}
+@media (prefers-reduced-motion: reduce) {
+  .story__media img {
+    transform: none;
+  }
 }
 /* 滚动视差：进入时图轻微漂移、出屏时按面板方向横向移开 */
 html.js .story__media {
@@ -1514,6 +1545,55 @@ html.js .story__slide[data-active="true"] .story__slide-cap {
   color: var(--c-text-mute);
   letter-spacing: 0.12em;
   opacity: 0.8;
+}
+/* 当前屏固定号牌（SpaceX 式任务序号，右上角） */
+.story__stag {
+  position: fixed;
+  top: 104px;
+  right: var(--gutter);
+  z-index: var(--z-sticky);
+  display: grid;
+  gap: 2px;
+  text-align: right;
+  font-family: var(--f-mono);
+  font-size: var(--fs-xs);
+  letter-spacing: 0.14em;
+  color: var(--c-text-mute);
+  background: color-mix(in srgb, var(--c-bg) 80%, transparent);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-full);
+  padding: var(--s-2) var(--s-3);
+  margin: 0;
+}
+.story__stag [data-story-stag-no] {
+  color: var(--c-accent);
+  font-weight: 600;
+}
+.story__stag-name {
+  opacity: 0.85;
+}
+/* 星尘粒子层：极淡星点 + 三团柔光，叠在暗化之上 */
+.story__dust {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: -1;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  opacity: 0.5;
+}
+:root[data-focus="on"] .story__dust,
+:root[data-focus="on"] .story__stag,
+:root[data-focus="on"] .story__hall-hint {
+  display: none !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  .story__dust {
+    display: none;
+  }
 }
 @media (orientation: portrait) , (max-width: 640px) {
   .story__slide {

@@ -401,17 +401,32 @@ function initStory(sig: AbortSignal) {
   const panes = Array.from(root.querySelectorAll<HTMLElement>("[data-pane]"))
   const progress = root.querySelector<HTMLElement>("[data-story-progress]")
   const hint = root.querySelector<HTMLElement>("[data-story-hint]")
+  const stag = root.querySelector<HTMLElement>("[data-story-stag]")
+  const stagNo = stag?.querySelector<HTMLElement>("[data-story-stag-no]") ?? null
+  const stagName = stag?.querySelector<HTMLElement>("[data-story-stag-name]") ?? null
   // 横向长廊：横幅作品左右滑动
   const hall = root.querySelector<HTMLElement>("[data-hall]")
   const hallTrack = hall?.querySelector<HTMLElement>("[data-hall-track]") ?? null
   const slides = hallTrack ? Array.from(hallTrack.children) as HTMLElement[] : []
   const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches
+  // 各屏中心的缓存（offsetTop 滚动时不变化，缓存避免每帧 reflow）
+  let tops: number[] = []
   let active = -1
   let slideActive = -1
   let raf = 0
+  const quiet = (n: number) => Math.max(-46, Math.min(46, n))
 
-  const updateHall = () => {
-    if (!hallTrack || !slides.length) return
+  const measure = () => {
+    tops = panes.map((p) => p.offsetTop)
+  }
+
+  const updateStag = (no: string, name: string) => {
+    if (stagNo) stagNo.textContent = no
+    if (stagName) stagName.textContent = name
+  }
+
+  const updateHall = (): number => {
+    if (!hallTrack || !slides.length) return 0
     // 使用视口坐标系（getBoundingClientRect），避免 offsetParent 不一致导致错位
     const viewMid = hallTrack.getBoundingClientRect().left + hallTrack.clientWidth / 2
     let idx = 0
@@ -432,15 +447,25 @@ function initStory(sig: AbortSignal) {
       slides[idx].dataset.active = "true"
       slides[idx].style.setProperty("--dir", String(idx > prev ? 1 : idx < prev ? -1 : 1))
     }
+    return idx
+  }
+
+  let stagKey = ""
+  const setStag = (no: string, name: string) => {
+    const k = `${no}|${name}`
+    if (k === stagKey) return
+    stagKey = k
+    updateStag(no, name)
   }
 
   const update = () => {
     raf = 0
     const vh = innerHeight
-    const at = scrollY + vh / 2
+    // 统一为相对 .story 的坐标系（与 tops / hall.offsetTop 一致）
+    const at = scrollY + vh / 2 - root.offsetTop
     let idx = 0
     for (let i = 0; i < panes.length; i++) {
-      const top = panes[i].offsetTop
+      const top = tops[i]
       const bottom = top + panes[i].offsetHeight
       if (at >= top && at < bottom) {
         idx = i
@@ -456,7 +481,28 @@ function initStory(sig: AbortSignal) {
         panes[i].dataset.exited = String(i < active)
       }
     }
-    updateHall()
+    // 滚动即叙事：图片按与视口中线的距离做反向景深视差（transform-only，60fps）
+    for (let i = 0; i < tops.length; i++) {
+      const c = tops[i] + panes[i].offsetHeight / 2
+      const d = quiet((c - at) * -0.06)
+      panes[i].style.setProperty("--depth", `${d}px`)
+    }
+    const hallIdx = updateHall()
+    // 号牌：进入横廊区间显示横廊序号，其余显示纵向屏序号 + 展厅名
+    if (hall && slides.length) {
+      const hTop = hall.offsetTop
+      const hBot = hTop + hall.offsetHeight
+      if (at >= hTop && at < hBot) {
+        setStag(`${String(hallIdx + 1).padStart(2, "0")} / ${String(slides.length).padStart(2, "0")}`, "横廊 · HALL")
+        stagKey = `pane|${active}` // 强制离开横廊时重写纵向号牌
+      } else {
+        const themeEn = panes[active].querySelector(".story__theme")?.textContent?.split("·")[0]?.trim() ?? ""
+        setStag(`${String(active + 1).padStart(2, "0")} / ${String(panes.length).padStart(2, "0")}`, themeEn)
+      }
+    } else {
+      const themeEn = panes[active].querySelector(".story__theme")?.textContent?.split("·")[0]?.trim() ?? ""
+      setStag(`${String(active + 1).padStart(2, "0")} / ${String(panes.length).padStart(2, "0")}`, themeEn)
+    }
     if (progress) {
       // 总进度 = 纵向滚动 + 横向长廊内折算
       const doc = document.documentElement.scrollHeight
@@ -487,6 +533,7 @@ function initStory(sig: AbortSignal) {
     )
   }
   addEventListener("resize", update, { passive: true, signal: sig })
+  measure()
   update()
   if (reduce) {
     panes.forEach((p) => {
@@ -495,6 +542,112 @@ function initStory(sig: AbortSignal) {
     })
     slides.forEach((s) => (s.dataset.active = "true"))
   }
+}
+
+/* ---------- 12b. Story 星尘粒子层（深空氛围，零依赖 2D canvas） ---------- */
+function initStoryDust(sig: AbortSignal) {
+  const canvas = document.querySelector<HTMLCanvasElement>("[data-story-dust]")
+  if (!canvas) return
+  const ctx = canvas.getContext("2d", { alpha: true })
+  if (!ctx) return
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) return
+  if (document.documentElement.dataset.focus === "on") return
+
+  const palette = ["255,213,79", "102,187,106", "249,168,37", "254,249,237"]
+  let w = 0
+  let h = 0
+  let dpr = 1
+  let stars: { x: number; y: number; s: number; ph: number; vy: number }[] = []
+  let raf = 0
+  let paused = false
+  let t = 0
+
+  const resize = () => {
+    dpr = Math.min(devicePixelRatio || 1, 1.5)
+    w = Math.max(1, innerWidth)
+    h = Math.max(1, innerHeight)
+    canvas.width = Math.floor(w * dpr)
+    canvas.height = Math.floor(h * dpr)
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+    const n = Math.min(Math.round((w * h) / 42000), 64)
+    stars = Array.from({ length: n }, () => ({
+      x: Math.random() * w,
+      y: Math.random() * h,
+      s: 0.5 + Math.random() * 1.5,
+      ph: Math.random() * Math.PI * 2,
+      vy: 0.08 + Math.random() * 0.22,
+    }))
+  }
+
+  const frame = () => {
+    raf = 0
+    if (paused) return
+    t += 0.016
+    ctx.clearRect(0, 0, w, h)
+    ctx.globalCompositeOperation = "lighter"
+    // 极淡柔光团，衬托画作
+    for (let i = 0; i < 3; i++) {
+      const bx = w * (0.2 + 0.6 * Math.sin(t * 0.08 + i * 2.1))
+      const by = h * (0.75 + 0.25 * Math.sin(t * 0.07 + i * 4.2))
+      const r = w * 0.22
+      const g = ctx.createRadialGradient(bx, by, 0, bx, by, r)
+      g.addColorStop(0, `rgba(${palette[i]},0.05)`)
+      g.addColorStop(1, `rgba(${palette[i]},0)`)
+      ctx.fillStyle = g
+      ctx.beginPath()
+      ctx.arc(bx, by, r, 0, Math.PI * 2)
+      ctx.fill()
+    }
+    // 缓慢上升的星尘
+    for (const st of stars) {
+      st.y -= st.vy
+      if (st.y < -8) {
+        st.y = h + 8
+        st.x = Math.random() * w
+      }
+      const a = 0.16 + 0.4 * (0.5 + 0.5 * Math.sin(t * 1.2 + st.ph))
+      ctx.fillStyle = `rgba(255,247,224,${a})`
+      ctx.beginPath()
+      ctx.arc(st.x, st.y, st.s, 0, Math.PI * 2)
+      ctx.fill()
+    }
+    ctx.globalCompositeOperation = "source-over"
+    raf = requestAnimationFrame(frame)
+  }
+
+  const start = () => {
+    if (!raf && !paused) raf = requestAnimationFrame(frame)
+  }
+  const stop = () => {
+    if (raf) cancelAnimationFrame(raf)
+    raf = 0
+  }
+
+  resize()
+  start()
+  addEventListener("resize", resize, { passive: true, signal: sig })
+  addEventListener(
+    "visibilitychange",
+    () => (document.hidden ? stop() : start()),
+    { signal: sig }
+  )
+  addEventListener(
+    "nl:pause-decor",
+    () => {
+      paused = true
+      stop()
+      ctx.clearRect(0, 0, w, h)
+    },
+    { signal: sig }
+  )
+  addEventListener(
+    "nl:resume-decor",
+    () => {
+      paused = false
+      start()
+    },
+    { signal: sig }
+  )
 }
 
 /* ---------- 13. 背景音乐（Web Audio 模块级单例：跨页保活、零外部资源） ---------- */
@@ -622,6 +775,7 @@ function boot() {
   initCountUp()
   initArtworkPager(sig)
   initStory(sig)
+  initStoryDust(sig)
   initMusic(sig)
 }
 

@@ -130,7 +130,17 @@ const landscape = items.filter((i) => i.w > i.h)
   <div class="story__progress" aria-hidden="true">
     <span data-story-progress></span>
   </div>
-  <p class="story__hint scroll-hint" aria-hidden="true">SCROLL ↓ 逐屏漫游</p>
+
+  <!-- 滚动即叙事：当前屏的固定号牌（SpaceX 式任务序号） -->
+  <p class="story__stag" data-story-stag aria-hidden="true">
+    <span data-story-stag-no></span>
+    <span class="story__stag-name" data-story-stag-name></span>
+  </p>
+
+  <!-- 深空氛围：story 专属星尘粒子层 -->
+  <canvas class="story__dust decor" data-story-dust aria-hidden="true"></canvas>
+
+  <p class="story__hint scroll-hint" data-story-hint aria-hidden="true">SCROLL ↓ 逐屏漫游</p>
 </section>
 
 <style>
